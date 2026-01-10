@@ -1,0 +1,5 @@
+{
+  "name": "MindFlow - AI Study Companion",
+  "description": "A minimalist, all-in-one study tool that generates summaries, flashcards, and quizzes from a single prompt using Gemini AI.",
+  "requestFramePermissions": []
+}
