@@ -1,7 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { generateStudyMaterial, regenerateSearchSummary, getSearchSuggestions } from './services/gemini';
-import { AppState, StudyGuide, TeacherContent, GrammarAnalysis, SearchResult } from './types';
+import { searchVideos } from './services/youtube';
+import { AppState, StudyGuide, TeacherContent, GrammarAnalysis, SearchResult, Video as VideoType } from './types';
 import { FlashcardDeck } from './components/FlashcardDeck';
 import { Quiz } from './components/Quiz';
 import { GenerativeSite } from './components/GenerativeSite';
@@ -12,7 +13,7 @@ import { SlideDeckView } from './components/SlideDeckView';
 import { LandingPage } from './components/LandingPage';
 import { DashboardHome } from './components/DashboardHome';
 import { SettingsView } from './components/SettingsView';
-import { Search as SearchIcon, Sparkles, BookOpen, BrainCircuit, GraduationCap, Layout, ArrowRight, Plus, Mic, ChevronDown, Layers, School, User, PieChart, Activity, Zap, FileText, LayoutDashboard, Clock, Star, Settings, LogOut, Menu, PenTool, ChevronLeft, ChevronRight, Volume2, Copy, RefreshCw, Download, FileUp, Globe, Video, ArrowUpRight, ExternalLink, Share, MoreHorizontal, Presentation, Home as HomeIcon } from 'lucide-react';
+import { Search as SearchIcon, Sparkles, BookOpen, BrainCircuit, GraduationCap, Layout, ArrowRight, Plus, Mic, ChevronDown, Layers, School, User, PieChart, Activity, Zap, FileText, LayoutDashboard, Clock, Star, Settings, LogOut, Menu, PenTool, ChevronLeft, ChevronRight, Volume2, Copy, RefreshCw, Download, FileUp, Globe, Video, ArrowUpRight, ExternalLink, Share, MoreHorizontal, Presentation, Home as HomeIcon, PlayCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function App() {
@@ -29,7 +30,7 @@ function App() {
   
   // Navigation State
   const [sidebarTab, setSidebarTab] = useState<'home' | 'search' | 'study' | 'settings'>('home');
-  const [activeTab, setActiveTab] = useState<'studyGuide' | 'flashcards' | 'quiz' | 'site' | 'notebook' | 'slides'>('studyGuide');
+  const [activeTab, setActiveTab] = useState<'studyGuide' | 'flashcards' | 'quiz' | 'site' | 'notebook' | 'slides' | 'videos'>('studyGuide');
   const [searchSubTab, setSearchSubTab] = useState<'ai' | 'sources' | 'videos' | 'gen'>('ai');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -117,7 +118,19 @@ function App() {
       setShowSuggestions(false);
       
       try {
-        const data = await generateStudyMaterial(searchPrompt, mode);
+        // Fetch videos in parallel
+        const videoPromise = searchVideos(searchPrompt);
+        const aiPromise = generateStudyMaterial(searchPrompt, mode);
+
+        const [videos, data] = await Promise.all([videoPromise, aiPromise]);
+        
+        // Attach videos to data object
+        if (mode === 'search') {
+            (data as SearchResult).videos = videos;
+        } else if (mode === 'student') {
+            (data as StudyGuide).videos = videos;
+        }
+
         setAppState(prev => ({ ...prev, status: 'success', data, error: null, mode: mode }));
         
         if (targetTab) {
@@ -246,6 +259,39 @@ function App() {
       {!isSidebarCollapsed && active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-lime-500 shrink-0" />}
     </button>
   );
+
+  const VideoGrid = ({ videos }: { videos?: VideoType[] }) => {
+    if (!videos || videos.length === 0) {
+        return <div className="text-gray-400 text-center py-10">No videos found.</div>;
+    }
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {videos.map((video) => (
+                <a 
+                    key={video.id} 
+                    href={`https://www.youtube.com/watch?v=${video.id}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="group bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col"
+                >
+                    <div className="relative aspect-video bg-gray-100">
+                        <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                            <div className="w-10 h-10 bg-white/90 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                <PlayCircle size={20} className="text-black ml-0.5" />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="p-4 flex-1 flex flex-col">
+                        <h3 className="font-bold text-gray-900 leading-tight mb-2 line-clamp-2">{video.title}</h3>
+                        <p className="text-xs text-gray-500 mb-2">{video.channelTitle}</p>
+                        <p className="text-xs text-gray-400 line-clamp-2 flex-1">{video.description}</p>
+                    </div>
+                </a>
+            ))}
+        </div>
+    );
+  };
 
   // Helper to determine if we should remove padding/scroll for full-screen tools like Notebook or Slides
   const isFullHeightView = appState.status === 'success' && (activeTab === 'notebook' || activeTab === 'slides') && appState.mode === 'student';
@@ -504,22 +550,22 @@ function App() {
                     className="flex flex-col h-full"
                 >
                     {/* Floating Top Nav */}
-                    <div className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-8 py-3 flex items-center gap-6">
+                    <div className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-8 py-3 flex items-center gap-6 overflow-x-auto no-scrollbar">
                         <button 
                              onClick={() => setSearchSubTab('ai')}
-                             className={`flex items-center gap-2 text-sm font-bold transition-colors ${searchSubTab === 'ai' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
+                             className={`flex items-center gap-2 text-sm font-bold transition-colors whitespace-nowrap ${searchSubTab === 'ai' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
                         >
                             <Sparkles size={16} /> AI Summary
                         </button>
                         <button 
                              onClick={() => setSearchSubTab('sources')}
-                             className={`flex items-center gap-2 text-sm font-bold transition-colors ${searchSubTab === 'sources' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
+                             className={`flex items-center gap-2 text-sm font-bold transition-colors whitespace-nowrap ${searchSubTab === 'sources' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
                         >
                             <Globe size={16} /> Sources
                         </button>
                          <button 
-                             className={`flex items-center gap-2 text-sm font-bold transition-colors text-gray-300 cursor-not-allowed`}
-                             title="Coming Soon"
+                             onClick={() => setSearchSubTab('videos')}
+                             className={`flex items-center gap-2 text-sm font-bold transition-colors whitespace-nowrap ${searchSubTab === 'videos' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
                         >
                             <Video size={16} /> Videos
                         </button>
@@ -528,7 +574,7 @@ function App() {
                         
                         <button 
                              onClick={() => setSearchSubTab('gen')}
-                             className={`flex items-center gap-2 text-sm font-bold transition-colors ${searchSubTab === 'gen' ? 'text-lime-600' : 'text-gray-400 hover:text-gray-600'}`}
+                             className={`flex items-center gap-2 text-sm font-bold transition-colors whitespace-nowrap ${searchSubTab === 'gen' ? 'text-lime-600' : 'text-gray-400 hover:text-gray-600'}`}
                         >
                             <Layout size={16} className={searchSubTab === 'gen' ? 'text-lime-600' : 'text-gray-400'} /> Gen Tab
                         </button>
@@ -590,6 +636,12 @@ function App() {
                                          <p className="text-sm text-gray-600 line-clamp-2">{source.snippet}</p>
                                      </div>
                                  ))}
+                             </motion.div>
+                         )}
+                         
+                         {searchSubTab === 'videos' && (
+                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                                 <VideoGrid videos={(appState.data as SearchResult).videos} />
                              </motion.div>
                          )}
 
@@ -669,6 +721,7 @@ function App() {
                                 { id: 'flashcards', label: 'Flashcards' },
                                 { id: 'quiz', label: 'Quiz' },
                                 { id: 'notebook', label: 'Notebook' },
+                                { id: 'videos', label: 'Videos' },
                                 ].map((tab) => (
                                 <button
                                     key={tab.id}
@@ -790,6 +843,18 @@ function App() {
                                 <NotebookView data={appState.data as StudyGuide} />
                                 </motion.div>
                             )}
+
+                             {activeTab === 'videos' && (
+                                 <motion.div
+                                     key="videos"
+                                     initial={{ opacity: 0, x: -10 }}
+                                     animate={{ opacity: 1, x: 0 }}
+                                     exit={{ opacity: 0, x: 10 }}
+                                 >
+                                     <VideoGrid videos={(appState.data as StudyGuide).videos} />
+                                 </motion.div>
+                             )}
+
                             </AnimatePresence>
                         </div>
                     </>

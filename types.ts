@@ -40,6 +40,15 @@ export interface Slide {
   layout: 'image-right' | 'image-left' | 'center';
 }
 
+export interface Video {
+  id: string;
+  title: string;
+  thumbnail: string;
+  channelTitle: string;
+  description: string;
+  publishedAt: string;
+}
+
 export interface StudyGuide {
   topic: string;
   summary: string;
@@ -51,6 +60,7 @@ export interface StudyGuide {
   quiz: QuizQuestion[];
   websiteContent: WebsiteContent;
   slides: Slide[];
+  videos?: Video[];
 }
 
 // Teacher Mode Types
@@ -63,7 +73,7 @@ export interface RubricItem {
 export interface WorksheetSection {
   title: string;
   type: 'multiple-choice' | 'short-answer' | 'essay' | 'matching' | 'activity' | 'fill-in-the-blank' | 'true-false' | 'sequencing';
-  content: string[]; // List of questions/items
+  content: string[]; // List of questions or items
 }
 
 export interface TeacherContent {
@@ -101,6 +111,7 @@ export interface SearchResult {
     sources: SearchSource[];
     relatedQuestions: string[];
     websiteContent: WebsiteContent; // Included for Gen Tab in search
+    videos?: Video[];
 }
 
 export interface AppState {

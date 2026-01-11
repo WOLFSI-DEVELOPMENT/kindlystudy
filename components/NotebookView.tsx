@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { StudyGuide } from '../types';
-import { Sparkles, PenLine, Download, Share, Highlighter, Bold, Italic, Underline, Strikethrough, Type } from 'lucide-react';
+import { Sparkles, PenLine, Download, Share, Highlighter, Bold, Italic, Underline, Strikethrough, Type, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SimpleBarChart, PexelsImage } from './GenerativeSite';
+import { exportToGoogleDoc } from '../services/googleSlides';
 
 interface NotebookViewProps {
   data: StudyGuide;
@@ -104,6 +105,7 @@ const FormattingToolbar = () => {
 export const NotebookView: React.FC<NotebookViewProps> = ({ data }) => {
   const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Extract important terms for highlighting
@@ -144,6 +146,19 @@ export const NotebookView: React.FC<NotebookViewProps> = ({ data }) => {
     URL.revokeObjectURL(url);
   };
 
+  const handleExportDocs = async () => {
+      setIsExporting(true);
+      try {
+          const docUrl = await exportToGoogleDoc(data.topic, data);
+          window.open(docUrl, '_blank');
+      } catch (e) {
+          console.error(e);
+          alert("Failed to export to Google Docs.");
+      } finally {
+          setIsExporting(false);
+      }
+  };
+
   return (
     <div className="relative w-full h-full bg-[#Fcfcfc] flex flex-col font-sans overflow-hidden group">
       
@@ -163,6 +178,14 @@ export const NotebookView: React.FC<NotebookViewProps> = ({ data }) => {
 
           {/* Action Buttons */}
           <div className="pointer-events-auto flex gap-2">
+               <button 
+                onClick={handleExportDocs}
+                disabled={isExporting}
+                className="w-10 h-10 bg-white/80 backdrop-blur-md shadow-sm border border-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:text-black hover:scale-105 transition-all disabled:opacity-50" 
+                title="Export to Google Docs"
+               >
+                   {isExporting ? <Loader2 size={16} className="animate-spin" /> : <img src="https://upload.wikimedia.org/wikipedia/commons/0/01/Google_Docs_logo_%282014-2020%29.svg" width="16" alt="docs"/>}
+               </button>
                <button className="w-10 h-10 bg-white/80 backdrop-blur-md shadow-sm border border-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:text-black hover:scale-105 transition-all" title="Highlight Mode">
                    <Highlighter size={16} />
                </button>

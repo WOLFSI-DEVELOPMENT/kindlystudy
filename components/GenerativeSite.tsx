@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { WebsiteContent, SiteSection, ChartData } from '../types';
-import { BarChart3, Image as ImageIcon } from 'lucide-react';
+import { BarChart3, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { exportToGoogleDoc } from '../services/googleSlides';
 
 interface GenerativeSiteProps {
   content: WebsiteContent;
@@ -11,7 +12,9 @@ interface GenerativeSiteProps {
 const PEXELS_API_KEY = '8Mh8jDK5VAgGnnmNYO2k0LqdaLL8lbIR4ou5Vnd8Zod0cETWahEx1MKf';
 
 export const SimpleBarChart = ({ data }: { data: ChartData }) => {
-  const maxValue = Math.max(...data.values);
+  // Ensure we have valid numbers and avoid division by zero
+  const cleanValues = data.values.map(v => Number(v) || 0);
+  const maxValue = Math.max(...cleanValues, 1); // Avoid 0 division
   
   return (
     <div className="w-full my-8">
@@ -19,25 +22,32 @@ export const SimpleBarChart = ({ data }: { data: ChartData }) => {
          <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{data.label}</span>
       </div>
       
-      <div className="flex items-end justify-between gap-4 h-56 w-full px-2">
-        {data.values.map((value, idx) => {
-          const heightPercentage = (value / maxValue) * 100;
+      {/* Changed items-end to items-stretch (default) and increased height. Added relative for positioning context. */}
+      <div className="flex justify-between gap-4 h-64 w-full px-2">
+        {cleanValues.map((value, idx) => {
+          const heightPercentage = Math.min(100, Math.max(0, (value / maxValue) * 100));
+          
           return (
-            <div key={idx} className="flex-1 flex flex-col items-center gap-3 group">
-               <div className="relative w-full flex items-end justify-center h-full bg-gray-50 rounded-2xl overflow-hidden">
+            <div key={idx} className="flex-1 flex flex-col items-center gap-3 group h-full justify-end">
+               {/* Bar Track: flex-1 takes available vertical space above the label */}
+               <div className="relative w-full flex-1 bg-gray-100/80 rounded-2xl overflow-hidden flex items-end justify-center">
                    <motion.div 
-                     initial={{ height: 0 }}
+                     initial={{ height: "0%" }}
                      whileInView={{ height: `${heightPercentage}%` }}
-                     transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1], delay: idx * 0.1 }}
-                     className="w-full bg-gray-900 rounded-t-lg opacity-90 group-hover:opacity-100 transition-opacity relative bottom-0"
+                     viewport={{ once: true }}
+                     transition={{ duration: 1.0, ease: "easeOut", delay: idx * 0.1 }}
+                     className="w-full bg-gray-900 rounded-t-md opacity-90 group-hover:opacity-100 transition-opacity relative min-h-[4px]"
                    >
                      {/* Tooltip */}
-                     <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-black text-white text-xs font-bold py-1.5 px-3 rounded-full opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 whitespace-nowrap shadow-xl z-10">
+                     <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-black text-white text-xs font-bold py-1.5 px-3 rounded-full opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 whitespace-nowrap shadow-xl z-20 pointer-events-none">
                         {value}
                      </div>
                    </motion.div>
                </div>
-               <span className="text-xs text-gray-400 font-medium truncate max-w-full">{data.labels[idx]}</span>
+               {/* Label */}
+               <span className="text-xs text-gray-500 font-medium truncate w-full text-center px-1 h-4 leading-4">
+                 {data.labels[idx]}
+               </span>
             </div>
           );
         })}
@@ -120,9 +130,40 @@ export const PexelsImage = ({ query, alt, className = "h-64 md:h-[400px] rounded
 };
 
 export const GenerativeSite: React.FC<GenerativeSiteProps> = ({ content }) => {
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportDocs = async () => {
+      setIsExporting(true);
+      try {
+          const docUrl = await exportToGoogleDoc(content.heroTitle, content);
+          window.open(docUrl, '_blank');
+      } catch (e) {
+          console.error(e);
+          alert("Failed to export to Google Docs.");
+      } finally {
+          setIsExporting(false);
+      }
+  };
+
+  const GoogleDocsIcon = () => (
+    <svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 254 349.247" enableBackground="new 0 0 254 349.247"><g id="g22" transform="scale(0.08) translate(500, 700)"><path id="path8" fill="#00832D" d="M7.334,22H0v5.334c0,1.105,0.895,2,2,2h5.334V22z"/><path id="path10" fill="#FFBA00" d="M7.334,0H2C0.895,0,0,0.895,0,2v20h7.334V7.334H14V0H7.334z"/><path id="path12" fill="#0066DA" d="M21.334,22H14v7.334h5.334c1.105,0,2-0.895,2-2V22z"/><path id="path14" fill="#00AC47" d="M14,22H7.334v7.334H14V22z"/><path id="path16" fill="#2684FC" d="M14,7.334V22h7.334V7.334H14z"/><path id="path18" fill="#EA4335" d="M14,0v7.334h7.334L14,0z"/></g></svg>
+  );
+
   return (
-    <div className="relative w-full bg-white rounded-[32px] overflow-hidden shadow-sm border border-gray-100 min-h-[800px]">
+    <div className="relative w-full bg-white rounded-[32px] overflow-hidden shadow-sm border border-gray-100 min-h-[800px] group">
       
+      {/* Floating Export Button */}
+      <div className="absolute top-8 right-8 z-30 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={handleExportDocs}
+            disabled={isExporting}
+            className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur border border-gray-200 text-gray-700 rounded-full hover:bg-white shadow-sm transition-all disabled:opacity-50 text-xs font-bold"
+          >
+            {isExporting ? <Loader2 size={14} className="animate-spin" /> : <img src="https://upload.wikimedia.org/wikipedia/commons/0/01/Google_Docs_logo_%282014-2020%29.svg" width="14" alt="docs"/>}
+            <span>Export Doc</span>
+          </button>
+      </div>
+
       {/* Background Blobs */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-purple-100/40 rounded-full blur-[80px]" />
