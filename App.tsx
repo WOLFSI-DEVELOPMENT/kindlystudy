@@ -11,6 +11,7 @@ import { NotebookView } from './components/NotebookView';
 import { SlideDeckView } from './components/SlideDeckView';
 import { LandingPage } from './components/LandingPage';
 import { DashboardHome } from './components/DashboardHome';
+import { SettingsView } from './components/SettingsView';
 import { Search as SearchIcon, Sparkles, BookOpen, BrainCircuit, GraduationCap, Layout, ArrowRight, Plus, Mic, ChevronDown, Layers, School, User, PieChart, Activity, Zap, FileText, LayoutDashboard, Clock, Star, Settings, LogOut, Menu, PenTool, ChevronLeft, ChevronRight, Volume2, Copy, RefreshCw, Download, FileUp, Globe, Video, ArrowUpRight, ExternalLink, Share, MoreHorizontal, Presentation, Home as HomeIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -27,7 +28,7 @@ function App() {
   });
   
   // Navigation State
-  const [sidebarTab, setSidebarTab] = useState<'home' | 'search' | 'study'>('home');
+  const [sidebarTab, setSidebarTab] = useState<'home' | 'search' | 'study' | 'settings'>('home');
   const [activeTab, setActiveTab] = useState<'studyGuide' | 'flashcards' | 'quiz' | 'site' | 'notebook' | 'slides'>('studyGuide');
   const [searchSubTab, setSearchSubTab] = useState<'ai' | 'sources' | 'videos' | 'gen'>('ai');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -129,7 +130,7 @@ function App() {
             ...prev,
             status: 'error',
             data: null,
-            error: err.message || "Something went wrong. Please try again.",
+            error: err.message || "Something went wrong. Please check your API Key in Settings.",
         }));
       }
   };
@@ -225,7 +226,10 @@ function App() {
                 toggleMode('search');
             } else if (id === 'study') {
                 setSidebarTab('study');
-                toggleMode('student'); // Default to student when clicking study
+                toggleMode('student'); 
+            } else if (id === 'settings') {
+                setSidebarTab('settings');
+                setAppState(prev => ({...prev, status: 'idle', data: null, error: null}));
             }
         }}
         className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-6'} py-3 rounded-full transition-colors duration-200 group relative ${
@@ -281,7 +285,7 @@ function App() {
            <SidebarItem id="study" icon={LayoutDashboard} label="Study" active={sidebarTab === 'study'} />
            <SidebarItem id="history" icon={Clock} label="History" />
            <SidebarItem id="favs" icon={Star} label="Favorites" />
-           <SidebarItem id="settings" icon={Settings} label="Settings" />
+           <SidebarItem id="settings" icon={Settings} label="Settings" active={sidebarTab === 'settings'} />
         </nav>
 
         <div className="mt-auto px-2 pb-2 w-full">
@@ -344,8 +348,21 @@ function App() {
                 </motion.div>
             )}
 
+            {/* SETTINGS TAB */}
+            {sidebarTab === 'settings' && (
+                <motion.div
+                    key="settings"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="w-full h-full"
+                >
+                    <SettingsView />
+                </motion.div>
+            )}
+
             {/* IDLE STATE (Search/Study Landing within Dashboard) */}
-            {sidebarTab !== 'home' && appState.status === 'idle' && (
+            {sidebarTab !== 'home' && sidebarTab !== 'settings' && appState.status === 'idle' && (
                 <motion.div
                 key="landing"
                 initial={{ opacity: 0 }}
@@ -353,6 +370,7 @@ function App() {
                 exit={{ opacity: 0, y: -20 }}
                 className="w-full h-full flex flex-col items-center justify-center min-h-[500px] px-4 md:px-8"
                 >
+                    {/* Landing Content ... */}
                     <div className="relative z-10 w-full max-w-3xl text-center">
                          <motion.div 
                                 initial={{ opacity: 0, y: 20 }}
@@ -391,7 +409,6 @@ function App() {
                                         </button>
                                     </div>
                                 </div>
-                                
                                 {/* Auto-Suggestions Dropdown */}
                                 <AnimatePresence>
                                 {showSuggestions && (
@@ -432,6 +449,32 @@ function App() {
                     </div>
                 </motion.div>
             )}
+
+            {/* ERROR STATE */}
+             {appState.status === 'error' && (
+                 <motion.div
+                    key="error"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="flex-1 flex flex-col items-center justify-center p-6 text-center"
+                 >
+                     <div className="bg-red-50 p-6 rounded-2xl max-w-md">
+                        <h3 className="text-red-600 font-bold mb-2">Error Generating Content</h3>
+                        <p className="text-red-500 text-sm mb-4">{appState.error}</p>
+                        <button 
+                            onClick={() => {
+                                setSidebarTab('settings');
+                                setAppState(prev => ({...prev, status: 'idle', error: null}));
+                            }}
+                            className="text-xs bg-red-100 hover:bg-red-200 text-red-700 font-bold py-2 px-4 rounded-full transition-colors"
+                        >
+                            Go to Settings to check API Key
+                        </button>
+                     </div>
+                 </motion.div>
+             )}
+
 
             {/* LOADING STATE */}
             {appState.status === 'loading' && (

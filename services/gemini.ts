@@ -2,6 +2,16 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { StudyGuide, TeacherContent, GrammarAnalysis, SearchResult } from "../types";
 
+const LOCAL_STORAGE_KEY_API = 'gemini_api_key';
+
+export const getApiKey = (): string | undefined => {
+  return localStorage.getItem(LOCAL_STORAGE_KEY_API) || process.env.API_KEY;
+};
+
+export const setStoredApiKey = (key: string) => {
+  localStorage.setItem(LOCAL_STORAGE_KEY_API, key);
+};
+
 // Shared Website Content Schema
 const websiteContentSchemaProperty = {
   type: Type.OBJECT,
@@ -193,11 +203,12 @@ const searchSchema: Schema = {
 };
 
 export const generateStudyMaterial = async (prompt: string, mode: 'student' | 'teacher' | 'grammar' | 'search'): Promise<StudyGuide | TeacherContent | GrammarAnalysis | SearchResult> => {
-  if (!process.env.API_KEY) {
-    throw new Error("API Key is missing.");
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    throw new Error("API Key is missing. Please add it in Settings.");
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     let systemPrompt = "";
@@ -256,13 +267,16 @@ export const generateStudyMaterial = async (prompt: string, mode: 'student' | 't
 
   } catch (error) {
     console.error("Gemini API Error:", error);
-    throw new Error("Failed to generate content. Please try again.");
+    throw new Error("Failed to generate content. Please check your API Key in Settings.");
   }
 };
 
 export const regenerateSearchSummary = async (prompt: string): Promise<string> => {
     // Helper specifically for the regenerate button in search
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = getApiKey();
+    if (!apiKey) throw new Error("API Key missing");
+
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-09-2025",
         contents: `Regenerate a clean, concise 1-4 sentence summary about: "${prompt}". Make it sound professional yet accessible. Do not include introductory phrases.`,
@@ -271,9 +285,10 @@ export const regenerateSearchSummary = async (prompt: string): Promise<string> =
 }
 
 export const getSearchSuggestions = async (query: string): Promise<string[]> => {
-  if (!process.env.API_KEY) return [];
+  const apiKey = getApiKey();
+  if (!apiKey) return [];
   
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   
   try {
     const response = await ai.models.generateContent({
